@@ -14,19 +14,26 @@ concurrency:
 
 jobs:
   release:
-    if: github.repository == 'YuJunZhiXue/dsh-purge'
+    # fork 修复：上游原门禁写死 YuJunZhiXue/dsh-purge（该仓库已 404），
+    # 导致本 workflow 在任何仓库（含上游后来的 HunYiSage）都永远不执行。
+    if: github.repository == '2217173240/dsh-purge'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Syntax-check plugin entry
+      - name: Syntax-check plugin sources
         run: |
-          node --check lib/index.js
-          node --check lib/core.js
-          node --check lib/reapply.js
+          # 全量 node --check：lib（含 redteam/rea）、bin、client.js
+          fail=0
+          while IFS= read -r f; do
+            node --check "$f" || fail=1
+          done < <(find lib bin -name '*.js' -o -name '*.mjs' | sort)
+          node --check client.js || fail=1
           node --input-type=module -e "import './lib/index.js'"
+          node --input-type=module -e "import './lib/rea/index.js'"
+          exit $fail
 
       - name: Publish GitHub Release
         env:
@@ -59,4 +66,4 @@ jobs:
           fi
           test -s "$zip"
           gh release upload "$tag" "$zip" --clobber
-          echo "published https://github.com/YuJunZhiXue/dsh-purge/releases/tag/${tag}"
+          echo "published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"

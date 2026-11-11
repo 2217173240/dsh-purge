@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # PR 之间互不干扰按 PR 分组；master 共用一个组且不取消（点2：发版主分支每个提交都要完整跑过）
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Syntax and smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 点3：不用 paths-ignore（被跳过的必需检查会永远卡住 PR）。
+      # 改成 job 永远执行、docs-only 时快速通过 —— 检查项状态是 success 不是 skipped。
+      - name: Detect docs-only change
+        id: docs
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="$(git rev-list --max-parents=0 HEAD | tail -1)"
+            if git rev-parse -q --verify origin/master >/dev/null; then
+              base="$(git merge-base HEAD origin/master || echo "$base")"
+            fi
+          fi
+          changed="$(git diff --name-only "${base}"...HEAD 2>/dev/null | sort -u)"
+          echo "changed files:"; echo "$changed"
+          code="$(echo "$changed" | grep -vE '^(docs/|README(\.|$)|release-notes\.md|LICENSE|screenshots\.json|\.gitignore|\.npmignore)' || true)"
+          if [ -z "$code" ]; then
+            echo "docs-only=true" >> "$GITHUB_OUTPUT"
+            echo 'Docs-only change; code checks pass trivially.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "docs-only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.docs.outputs.docs-only == 'false'
+        with:
+          node-version: 22
+          # 本仓库零 npm 依赖，无需依赖缓存（点4：用不上的缓存不占 10GB 配额）
+
+      - name: Syntax-check all sources
+        if: steps.docs.outputs.docs-only == 'false'
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            node --check "$f" || fail=1
+          done < <(find lib bin -name '*.js' -o -name '*.mjs' | sort)
+          node --check client.js || fail=1
+          for s in scripts/*.sh; do bash -n "$s" || fail=1; done
+          exit $fail
+
+      - name: Import smoke test
+        if: steps.docs.outputs.docs-only == 'false'
+        run: |
+          node --input-type=module -e "import './lib/index.js'; console.log('lib/index.js import OK')"
+          node --input-type=module -e "import './lib/rea/index.js'; console.log('lib/rea/index.js import OK')"
+
+      - name: Preset composition check
+        if: steps.docs.outputs.docs-only == 'false'
+        run: |
+          # 用插件自带的 fail-closed 解析器验证两个预设可挂载。
+          # （cordis.patch.yml 是宿主 patch 格式，允许无 name 的 config 行，
+          #   不适用该解析器，由宿主装载时校验。）
+          node --input-type=module -e "
+            import { readPresetDefinition } from './lib/redteam/preset-composition.js';
+            for (const id of ['redteam', 'rea']) {
+              const def = readPresetDefinition(id, './presets/' + id + '/');
+              console.log('preset', def.id, def.name, '→', def.plugins.length, 'rows OK');
+            }
+          "
+        env:
+          DSH_HOME: /tmp/ci-dsh-home
+
+      - name: Install assets dry-run
+        if: steps.docs.outputs.docs-only == 'false'
+        run: |
+          # 自举落盘冒烟：真实跑一遍 rea 资产同步，验证包内文件完整性
+          node --input-type=module -e "
+            import { installReaAssets } from './lib/rea/index.js';
+            const r = installReaAssets((m) => console.log('[boot]', m));
+            if (r.preset < 1 || r.skills < 1) { console.error('assets missing:', JSON.stringify(r)); process.exit(1); }
+            console.log('assets OK:', r.preset, 'preset files,', r.skills, 'skills,', r.setup);
+          "
+        env:
+          DSH_HOME: /tmp/ci-dsh-home
