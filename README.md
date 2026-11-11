@@ -87,6 +87,7 @@ Harness does more than forward a prompt. It rewrites prompts, approval gates, sa
 | **dsh-purge dock** | A button beside the session title opens the right dock. Two pages: Clean and Drill |
 | **Clean** | Grouped patch status, Apply / Restore / Uninstall, prompt editor, multiple rule sets |
 | **Drill** | Built into the stable release. After authorization: assets and the local environment. The skill library and knowledge base ship with it. |
+| **RE bench (REA mode)** | Since 1.2.0. REA MCP wiring: 170+ reverse-engineering tools (`mcp__rea__*`), an "REA mode" agent preset, and nine runbooks with evidence discipline. See [docs/rea.md](docs/rea.md) |
 | **Host policy** | Default copy, permission policy, and tool limits. Official capabilities stay. No second invented identity |
 | **On start** | Checks and reapplies. After npm overwrites `node_modules`, you do not hand-edit files |
 

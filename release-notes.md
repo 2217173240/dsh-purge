@@ -1,3 +1,39 @@
+# 1.2.0
+
+## 中文
+
+- 版本 **1.2.0**：新增「逆向台（REA 模式）」——dsh-purge × [morluto/rea](https://github.com/morluto/rea) 融合。
+- bundle patch 新增 `dsh-purge-rea-mcp` 行：经官方 `@deepseek-ai/dsh-mcp-client` 注册 REA MCP server
+  （`npx -y rea-agents@6.8.0 mcp`），170+ 逆向工具以 `mcp__rea__*` 直达模型；`failOnStartupError: false`，离线不拖垮宿主。
+- 新增 `presets/rea`：「逆向模式」进模式下拉。分析师人设（REA 工具 > 技能手册 > Bash 的硬次序、
+  binary_session 生命周期、证据纪律、样本为不可信数据的红线）+ 委派组（叶子节点约束与 redteam 同款）。
+- 新增 `skills/rea` 九份运行手册：总览路由 / 原生二进制 / 脱壳恢复 / JS·Electron / 安卓 /
+  动态观测 / 版本对比 / 固件 / 环境排查，随包同步到 `$DSH_HOME/rea/skills`。
+- 新增 `lib/rea/index.js` 自举：预设与技能落地（内容变化才覆盖、不删用户文件）、
+  软取 agentPresets 注册、状态文件 `$DSH_HOME/rea/preset-declare.json`。
+- 新增 `scripts/rea-setup.sh`：引擎预检（Ghidra/JADX/Frida/binwalk 等只读检查 + 安装指引），
+  可选 `--fetch` 预拉 npm 包。
+- 新增 `docs/rea.md`：深入浅出的架构 / 安装 / 使用 / 故障排查文档。
+- 署名保留 dsh-purge（YuJunZhiXue）与 REA（morluto）双 MIT 来源。
+
+## English
+
+- **1.2.0**: adds the RE bench (REA mode) — dsh-purge × [morluto/rea](https://github.com/morluto/rea).
+- New `dsh-purge-rea-mcp` bundle row registers the REA MCP server via the official
+  `@deepseek-ai/dsh-mcp-client` (`npx -y rea-agents@6.8.0 mcp`): 170+ RE tools reach the model as
+  `mcp__rea__*`; `failOnStartupError: false` keeps the host alive offline.
+- New `presets/rea`: "逆向模式" in the mode dropdown. Analyst persona (REA tools > skill manuals >
+  Bash ordering, binary_session lifecycle, evidence discipline, samples-as-untrusted-data red line)
+  plus the redteam-style leaf-node delegation group.
+- New `skills/rea` runbooks (nine): overview/routing, native binaries, unpacking, JS/Electron,
+  Android, dynamic observation, version diff, firmware, environment triage; synced to `$DSH_HOME/rea/skills`.
+- New `lib/rea/index.js` bootstrap: lands presets/skills (overwrite only on content change, never
+  deletes user files), soft-registers the agent preset, status at `$DSH_HOME/rea/preset-declare.json`.
+- New `scripts/rea-setup.sh`: provider preflight (read-only checks + install hints for
+  Ghidra/JADX/Frida/binwalk), optional `--fetch` npm warm-up.
+- New `docs/rea.md`: architecture / install / usage / troubleshooting guide.
+- Dual MIT attribution kept for dsh-purge (YuJunZhiXue) and REA (morluto).
+
 # 1.1.71
 
 ## 中文

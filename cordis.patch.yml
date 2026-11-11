@@ -69,3 +69,24 @@
     # 演练台 HTTP 桥 POST /redteam/api
     - id: dsh-purge-redteam-ui
       name: dsh-purge/redteam/ui
+
+    # ── 逆向台（REA）───────────────────────────────────────────────────────
+    # 能力半侧：REA MCP server（170+ 逆向工具，注册为 mcp__rea__*）。
+    # 官方模板同款形态：templates/mcp/cordis.patch.yml。
+    # failOnStartupError: false —— 离线/npx 拉不起时宿主不受影响，工具缺席即可（技能 rea-environment 有排查路径）。
+    - id: dsh-purge-rea-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: rea
+        transport: stdio
+        command: npx
+        args:
+          - '-y'
+          - 'rea-agents@6.8.0'
+          - 'mcp'
+        failOnStartupError: false
+
+    # 编排半侧：预设 + 技能落地（本插件 lib/rea）
+    - id: dsh-purge-rea
+      name: dsh-purge/rea
+
