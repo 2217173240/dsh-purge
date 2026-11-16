@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
-import { ALL_PATCHES, targetFiles, patchStatus, findAiBase, findDshHome } from "../lib/core.js";
+import { ALL_PATCHES, targetFiles, patchStatus, findAiBase, readHostVersion, sameHostVersion } from "../lib/core.js";
 
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 const aiBase = process.argv[2] || findAiBase();
@@ -27,15 +27,22 @@ if (!aiBase) {
 // 沙箱里 process.env 可能是空的，findDshHome() 会拼出 /Users/.dsh 这种坏路径；
 // 这里优先 DSH_HOME，其次 os.homedir()，最后才回落到插件自己的推导。
 const dshHome = process.env.DSH_HOME || path.join(os.homedir(), ".dsh");
-let version = "unknown";
-for (const rel of ["../../package.json", "../../../package.json", "../../../../package.json"]) {
-  try {
-    const p = JSON.parse(fs.readFileSync(path.join(aiBase, rel), "utf8"));
-    if (p.version) { version = p.version; break; }
-  } catch { /* 继续尝试下一个位置 */ }
-}
+// 版本只认 core.readHostVersion（@deepseek-ai/dsh 的真实 package.json），
+// 不再按 ../../package.json 猜 —— 那正是「快照标 rc.2、宿主已 rc.3」的来源。
+const host = readHostVersion(aiBase);
+const version = host?.version || "unknown";
+const versionForDir = version.replace(/[^0-9A-Za-z._-]/g, "_");
+// 与 applied.json 的 hostVersion 对齐：快照拍的是哪一版，补丁又是在哪一版上打的。
+let appliedHostVersion = "";
+try {
+  const applied = JSON.parse(fs.readFileSync(path.join(dshHome, "dsh-purge", "applied.json"), "utf8"));
+  appliedHostVersion = String(applied?.hostVersion || "");
+} catch { /* 首次快照 / 旧 applied.json 没有该字段：保持未知 */ }
+const versionAligned = appliedHostVersion && version !== "unknown"
+  ? sameHostVersion(appliedHostVersion, version)
+  : null;
 const ts = new Date().toISOString().replace(/[:.]/g, "-");
-const outDir = path.join(dshHome, "dsh-purge", "snapshots", version + "__" + ts);
+const outDir = path.join(dshHome, "dsh-purge", "snapshots", versionForDir + "__" + ts);
 fs.mkdirSync(path.join(outDir, "files"), { recursive: true });
 
 const files = targetFiles(aiBase, dshHome);
@@ -68,7 +75,29 @@ fs.writeFileSync(path.join(outDir, "manifest.tsv"), "key\trel\tsize\tsha256\tori
 const status = await patchStatus(aiBase);
 const counts = {};
 for (const v of Object.values(status)) counts[v] = (counts[v] || 0) + 1;
-fs.writeFileSync(path.join(outDir, "meta.json"), JSON.stringify({ version, aiBase, createdAt: new Date().toISOString(), counts, status }, null, 1));
+const meta = {
+  version,
+  versionSource: host ? "readHostVersion" : "unknown",
+  hostVersion: version,
+  hostName: host?.name || "",
+  hostPackage: host?.path || "",
+  appliedHostVersion,
+  hostVersionAligned: versionAligned,
+  aiBase,
+  createdAt: new Date().toISOString(),
+  counts,
+  status,
+};
+fs.writeFileSync(path.join(outDir, "meta.json"), JSON.stringify(meta, null, 1));
 
 console.log("快照: " + outDir);
 console.log("版本: " + version + "  文件: " + copied.length + "  补丁状态: " + JSON.stringify(counts));
+console.log("applied.json hostVersion: " + (appliedHostVersion || "(未知 / legacy stamp)")
+  + "  对齐: " + (versionAligned === null ? "未知" : versionAligned ? "是" : "否"));
+if (version === "unknown") {
+  console.warn("[warn] 读不到宿主版本（readHostVersion 为空），快照目录标记为 unknown");
+}
+if (versionAligned === false) {
+  console.warn("[warn] 快照宿主版本 " + version + " 与 applied.json hostVersion " + appliedHostVersion
+    + " 不一致：补丁可能是在另一版宿主上打的，升级/降级后请先跑 scripts/drift-report.mjs。");
+}

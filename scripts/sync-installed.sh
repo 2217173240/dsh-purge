@@ -15,6 +15,10 @@ fi
 rsync -a --delete "$SRC/lib/" "$DST/lib/"
 [ -d "$SRC/scripts" ] && rsync -a "$SRC/scripts/" "$DST/scripts/"
 [ -d "$SRC/docs" ] && rsync -a "$SRC/docs/" "$DST/docs/"
+# client.js 是侧栏/弹窗的渲染端入口，不随 lib/ 走；漏掉它会出现「改了 UI 却完全没变化」。
+[ -f "$SRC/client.js" ] && cp "$SRC/client.js" "$DST/client.js"
+# presets 不进 lib/，但红队/逆向模式靠它注册；不同步会出现「preset 用的是旧版」。
+[ -d "$SRC/presets" ] && rsync -a --delete "$SRC/presets/" "$DST/presets/"
 cp "$SRC/package.json" "$DST/package.json"
 echo "已同步: $SRC -> $DST"
 node -e "console.log('installed version=' + require('$DST/package.json').version)" 2>/dev/null || true

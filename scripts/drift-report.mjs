@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
-import { ALL_PATCHES, targetFiles, filePatchOutcome, findAiBase } from "../lib/core.js";
+import { ALL_PATCHES, targetFiles, filePatchOutcome, findAiBase, readHostVersion, sameHostVersion } from "../lib/core.js";
 import { findWithTiers, tokenize } from "../lib/anchor-match.js";
 
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
@@ -40,19 +40,22 @@ if (!snapshotDir) {
   } catch { /* 没有快照也能跑 */ }
 }
 
-const currentVersion = (() => {
-  for (const rel of ["../../package.json", "../../../package.json"]) {
-    try { const p = JSON.parse(fs.readFileSync(path.join(aiBase, rel), "utf8")); if (p.version) return p.version; } catch { /* next */ }
-  }
-  return "unknown";
-})();
+// 与 snapshot-host.mjs / applied.json 用同一个版本源，避免拿错 package.json。
+const currentVersion = readHostVersion(aiBase)?.version || "unknown";
+let appliedHostVersion = "";
+try {
+  const applied = JSON.parse(fs.readFileSync(path.join(dshHome, "dsh-purge", "applied.json"), "utf8"));
+  appliedHostVersion = String(applied?.hostVersion || "");
+} catch { /* 旧 applied.json 没有 hostVersion */ }
 
 let snapshotVersion = "none";
+let snapshotAppliedHostVersion = "";
 const fileDelta = { changed: [], missing: [], unchanged: 0 };
 if (snapshotDir) {
   try {
     const meta = JSON.parse(fs.readFileSync(path.join(snapshotDir, "meta.json"), "utf8"));
     snapshotVersion = meta.version || "unknown";
+    snapshotAppliedHostVersion = String(meta.appliedHostVersion || "");
     const rows = fs.readFileSync(path.join(snapshotDir, "manifest.tsv"), "utf8").split("\n").slice(1).filter(Boolean);
     for (const row of rows) {
       const [key, rel, , hash, orig] = row.split("\t");
@@ -117,6 +120,15 @@ for (const patch of ALL_PATCHES) {
 }
 
 console.log("宿主版本: " + currentVersion + "   快照版本: " + snapshotVersion);
+console.log("applied.json hostVersion: " + (appliedHostVersion || "(未知 / legacy stamp)"));
+if (appliedHostVersion && currentVersion !== "unknown" && !sameHostVersion(appliedHostVersion, currentVersion)) {
+  console.warn("[warn] 补丁记录在宿主 " + appliedHostVersion + " 上应用，当前宿主是 " + currentVersion
+    + "：旧锚点可能不适配，先按下面的漂移结论处理再 apply。");
+}
+if (snapshotAppliedHostVersion && appliedHostVersion && !sameHostVersion(snapshotAppliedHostVersion, appliedHostVersion)) {
+  console.warn("[warn] 快照记录的 applied hostVersion (" + snapshotAppliedHostVersion + ") 与当前 applied.json ("
+    + appliedHostVersion + ") 不一致：快照与补丁记录不是同一版。");
+}
 if (snapshotDir) {
   console.log("文件对比: 改动 " + fileDelta.changed.length + " · 丢失 " + fileDelta.missing.length + " · 未变 " + fileDelta.unchanged);
   if (fileDelta.changed.length) console.log("  改动: " + fileDelta.changed.slice(0, 12).join(", "));
