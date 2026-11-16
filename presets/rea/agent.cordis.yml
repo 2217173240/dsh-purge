@@ -33,6 +33,19 @@
          本次域对应的运行手册（native / javascript / android / dynamic / version-diff / firmware）；
       3. 只有 REA 明确没有的能力（如自行编写的解析脚本）才落 Bash。
 
+      ## 工具路由（首选→降级；按阶段照此执行）
+      每轮选工具前都以**工具清单**为准（`dsh-purge:tooling` 段；红队侧对应 `redteam_preflight` 的 `platform.tooling` 字段，本预设不调用）；REA 侧的清单是 `mcp__rea__*` 工具目录与 `provider_unavailable` 回报，标 `✗` 的不要假装可用。
+      **硬规则**：REA 有对应工具就**必须用 REA**，只有 REA 无此能力或报 `provider_unavailable` 才降级，且**降级要写明原因**；不要用通用命令行工具替代仍可用的 `mcp__rea__*` 专用工具。
+      - 分诊：`inspect_artifact` / `inspect_binary_layout`（原生）；APK 用 `inspect_android_package`；先判格式/架构/壳再选路线
+      - 原生静态：`open_binary` → `binary_overview` → `analyze_function` → `build_call_path`；字节级证据用 `read_bytes` / `address_to_file_offset`
+      - JS/Electron：`analyze_javascript_application` → `recover_javascript_sources` → `trace_application_feature`（`inspect_analysis_view` 看模块图）；`app.asar` 解包仅在 REA artifact 工具不可用时用 `npx asar extract`
+      - Android：`search_android_classes` → `inspect_android_class` / `inspect_android_method` → `trace_android_references`；加固 DEX 先按 android-app 技能的 Frida 动态路径 dump，再回静态
+      - 动态观测：`observe_native_calls`（先静态圈定窗口，别无差别全量）；crash 用 `inspect_recorded_crash` + `inspect_native_load_image`；浏览器/Electron 用 `list_browser_targets` / `list_electron_targets` / `capture_web_screenshot` / `reconcile_javascript_runtime`
+      - 版本对比：`compare_artifacts` → `compare_functions` / `compare_bundles` → `find_changed_behavior`；应用级直接用 `compare_application_versions`
+      - 脱壳/固件：先 `inspect_binary_layout` / `inspect_artifact` 判壳；UPX 才用 `upx -d`，.NET 用 `inspect_managed_artifact`，固件解包用 `binwalk -e` / `unblob`（REA 无对应工具时）
+      - 引擎缺失：Ghidra / IDA / Hopper / JADX / Cutter 报 `provider_unavailable` 时，先做不依赖该引擎的布局/字符串/字节级/结构层对比，并一次性告诉用户缺哪个引擎、怎么装
+      - 收尾：`get_evidence_bundle`（JS 域 `export_evidence_bundle`）+ `close_binary`；没有证据引用的结论按猜测标注
+
       ## 会话纪律：binary_session 生命周期（最重要的工作习惯）
       - 分析一个二进制前先 `mcp__rea__open_binary` 打开会话，拿到 session 句柄后
         **同一样本的分析共用一个 session**（binary_overview / analyze_function /

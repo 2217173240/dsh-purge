@@ -55,6 +55,17 @@
       4. **补不齐就给替代方案并说明降级**：例如 FOFA 不可用 → 证书透明（crt.sh）、被动 DNS、`subfinder`/`dnsx`、搜索引擎与备案信息；没有 VPS → 先做不需要落地的成果（账号、数据、未授权）并写清限制。
       5. 预检结论要在正式汇报里复述一次。
 
+      ## 工具路由（首选→降级；派活时按阶段写进任务书）
+      每轮选工具前都以**工具清单**为准（`dsh-purge:tooling` 段 / `redteam_preflight` 的 `platform.tooling` 与 `platform.tools.items`）；`platform.tooling.coreMissing` 里的、或 `platform.tools.items[].path` 为空的工具按 `✗` 处理，**不要假装可用**，也不要写进任务书；清单未列的工具先 `command -v` 实测，找不到再查 `$DSH_HOME/redteam/toolkit/`。
+      **硬规则**：首选可用就**必须用首选**；只有首选不可用（清单 `✗` 或本机实测缺失）才降级，**降级必须在任务书和回报里写明原因**；不要用同类通用命令替代已可用的专用工具。
+      - 信息收集：FOFA / crt.sh → subfinder / dnsx → naabu / pd-httpx → gowitness（截图留证）
+      - 主动扫描：nmap（`-sV -sC` 服务/脚本）→ nuclei（Nday/1day 模板）；nmap 不可用才用 masscan / naabu 探端口，再用 pd-httpx / nuclei 补指纹
+      - Web/目录：ffuf / feroxbuster（首选）→ dirsearch（前两者不可用）；指纹 whatweb / nuclei（`pd-httpx -tech-detect` 可先行）
+      - 凭据：在线 hydra（`-t` 限流防锁号）；离线 hashcat → john（无 GPU 或格式不识别时）；协议级 impacket-*（nxc/netexec 备选）
+      - 内网：gogo（铺面/指纹）→ fscan（打点/弱口令/未授权）；横向 impacket-* / nxc(netexec)，走隧道时统一 `proxychains4 -f`
+      - 隧道：suo5（有 WebShell 必首选）→ chisel（只有命令执行）→ frp（长期稳定/端口映射）→ ligolo-ng（TUN 备选）
+      - 验收：子智能体回报必须写清工具、完整命令与回显摘要；没用首选又没写降级原因的，按未完成打回。
+
       ## 并发硬约束（最多 3 个，默认顺序派）
       - **同一靶标同时最多 3 个执行智能体**。派活前先 `redteam_agent_slot`（action=status）看名额；要派就 action=acquire 占位；被拒就是满了，**不要重试硬塞**，等现有智能体回报。
       - **默认一个一个派、按顺序推进**；只有确实互不依赖的活才并行，且总数 ≤ 3。
@@ -126,6 +137,11 @@
 
 - id: redteam-tools
   name: dsh-purge/redteam/tools
+
+# 工具清单 prompt section（order 10120）：同步读 tool-manifest 缓存，apply 时后台刷新一次。
+# 只在红队预设内注册；rea 的工具来自 mcp__rea__*，不注入本清单。
+- id: redteam-tooling
+  name: dsh-purge/redteam/tooling-section
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

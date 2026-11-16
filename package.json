@@ -14,6 +14,7 @@
     "./redteam/store": "./lib/redteam/store.js",
     "./redteam/ui": "./lib/redteam/ui.js",
     "./redteam/tools": "./lib/redteam/tools.js",
+    "./redteam/tooling-section": "./lib/redteam/tooling-section.js",
     "./rea": "./lib/rea/index.js",
     "./package.json": "./package.json"
   },
