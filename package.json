@@ -95,8 +95,9 @@
   "engines": {
     "node": ">=18"
   },
-  "dshTarget": "0.2.1-rc.5",
+  "dshTarget": "0.2.2-rc.3",
   "dshTargets": [
+    "0.2.2-rc.3",
     "0.2.1-rc.5",
     "0.2.1-rc.2"
   ]
