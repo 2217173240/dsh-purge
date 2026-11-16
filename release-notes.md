@@ -1,3 +1,28 @@
+# 1.2.1
+
+## 中文
+
+- 版本 **1.2.1**：「按能力就绪、局部降级」整改。
+- `lib/rea/index.js` 预设注册改为**就绪驱动**：注册成功（declaredOk）才停止轮询；
+  读取失败 / 注册失败 / registered-broken 在 45s 窗口内每 3s 自动重试——
+  用户修好磁盘上的预设文件或宿主 agentPresets 平面恢复后**无需重启即可重新启用**
+  （此前首次失败即放弃，只能等下次启动）。重试带 attemptInFlight 防并发叠加。
+- 资产落地（预设/技能/setup 脚本）本就相互独立 try（单项失败不影响其余），
+  与 MCP 行 `failOnStartupError: false`、技能手册的 provider_unavailable
+  降级路径共同构成完整的局部降级面；本次无行为变更。
+
+## English
+
+- **1.2.1**: capability-readiness hardening.
+- `lib/rea/index.js` preset registration is now readiness-driven: polling stops only
+  after a successful declaration; read/register/broken failures retry every 3s within
+  the 45s window, so a fixed preset file or a recovered agentPresets plane re-enables
+  the mode without a host restart (previously the first failure gave up until reboot).
+  Guarded against overlapping attempts.
+- Asset landing (preset/skills/setup script) already degrades per-item; together with
+  the MCP row's `failOnStartupError: false` and the provider_unavailable skill paths
+  this completes the partial-degradation surface. No behavior change there.
+
 # 1.2.0
 
 ## 中文
